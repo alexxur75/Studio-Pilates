@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Studio Pilates</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f8f6;color:#1a1a1a;font-size:15px}
+  input,select{width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;background:#fff}
+  input:focus,select:focus{border-color:#5DCAA5}
+  button{cursor:pointer;font-size:14px;font-family:inherit}
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:500}
+  .badge-green{background:#E1F5EE;color:#0F6E56}
+  .badge-yellow{background:#FAEEDA;color:#854F0B}
+  .badge-red{background:#FCEBEB;color:#A32D2D}
+  .badge-gray{background:#F1EFE8;color:#5F5E5A}
+  .card{background:#fff;border-radius:12px;border:1px solid #eee;padding:14px 16px}
+  .btn{padding:8px 16px;border-radius:8px;border:1px solid #ddd;background:#fff;transition:background 0.15s}
+  .btn:hover{background:#f5f5f5}
+  .btn-primary{background:#5DCAA5;color:#fff;border-color:#5DCAA5}
+  .btn-primary:hover{background:#4db894}
+  .btn-danger{background:#FCEBEB;color:#A32D2D;border-color:#F09595}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px}
+  .modal{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto}
+  .nav-btn{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;border:none;background:transparent;color:#888;font-size:13px;white-space:nowrap}
+  .nav-btn.active{background:#f0f0ec;color:#1a1a1a;font-weight:500}
+  .row{display:flex;align-items:center;gap:10px}
+  .col{display:flex;flex-direction:column;gap:8px}
+  h2{font-size:18px;font-weight:500}
+  h3{font-size:15px;font-weight:500}
+  label{font-size:12px;color:#888;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const SUPABASE_URL = "https://kgltrhrwtlbzheslgzlm.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnbHRyaHJ3dGxiemhlc2xnemxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODEyMjAsImV4cCI6MjA5NTk1NzIyMH0.-qxaV_z_k-DE6ai9UBpVGtvcB6sAy4CVQaq6f91CkiA";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const DAYS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const HOURS = Array.from({length:14},(_,i)=>i+7);
+const fmt = h=>`${h}:00`;
+const MAX = 15;
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+const Avatar = ({nombre,size=36,color})=>{
+  const ini = nombre?.split(" ").map(n=>n[0]).join("").slice(0,2)||"?";
+  const bg = color||"#EEEDFE", tc = color?"#fff":"#534AB7";
+  return <div style={{width:size,height:size,borderRadius:"50%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:size*0.35,color:tc,flexShrink:0}}>{ini}</div>;
+};
+
+const Badge = ({estado})=>{
+  const map={pagado:"green",pendiente:"yellow",vencido:"red"};
+  const txt={pagado:"Pagado",pendiente:"Pendiente",vencido:"Vencido"};
+  return <span className={`badge badge-${map[estado]||"gray"}`}>{txt[estado]||estado}</span>;
+};
+
+// ---- LOGIN ----
+function Login({onLogin}){
+  const [email,setEmail]=React.useState("admin@studiopilates.com");
+  const [pass,setPass]=React.useState("Admin1234!");
+  const [err,setErr]=React.useState("");
+  const [loading,setLoading]=React.useState(false);
+
+  const login = async()=>{
+    setLoading(true); setErr("");
+    const {data,error} = await sb.auth.signInWithPassword({email,password:pass});
+    if(error){setErr("Email o contraseña incorrectos");setLoading(false);return;}
+    const {data:prof} = await sb.from("profiles").select("*").eq("id",data.user.id).single();
+    onLogin(data.user, prof);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div className="card" style={{width:"100%",maxWidth:340,padding:28}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{fontSize:36,marginBottom:8}}>🧘</div>
+          <h2>Studio Pilates</h2>
+          <p style={{color:"#888",fontSize:13,marginTop:4}}>Sistema de gestión de turnos</p>
+        </div>
+        <div className="col">
+          <div><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} type="email"/></div>
+          <div><label>Contraseña</label><input value={pass} onChange={e=>setPass(e.target.value)} type="password"/></div>
+          {err&&<p style={{color:"#A32D2D",fontSize:13}}>{err}</p>}
+          <button className="btn btn-primary" onClick={login} disabled={loading} style={{width:"100%",padding:10,marginTop:4}}>
+            {loading?"Ingresando...":"Ingresar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- APP PRINCIPAL ----
+function App(){
+  const [user,setUser]=React.useState(null);
+  const [profile,setProfile]=React.useState(null);
+  const [vista,setVista]=React.useState("dashboard");
+  const [loading,setLoading]=React.useState(true);
+
+  React.useEffect(()=>{
+    sb.auth.getSession().then(async({data:{session}})=>{
+      if(session){
+        const {data:prof}=await sb.from("profiles").select("*").eq("id",session.user.id).single();
+        setUser(session.user); setProfile(prof);
+        setVista(prof?.rol==="alumno"?"mis-turnos":"dashboard");
+      }
+      setLoading(false);
+    });
+    const {data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>{
+      if(!session){setUser(null);setProfile(null);}
+    });
+    return()=>subscription.unsubscribe();
+  },[]);
+
+  if(loading) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#888"}}>Cargando...</div>;
+  if(!user||!profile) return <Login onLogin={(u,p)=>{setUser(u);setProfile(p);setVista(p?.rol==="alumno"?"mis-turnos":"dashboard");}}/>;
+
+  const nav = profile.rol==="admin"
+    ?[{k:"dashboard",i:"📊",l:"Dashboard"},{k:"calendario",i:"📅",l:"Calendario"},{k:"alumnos",i:"👥",l:"Alumnos"},{k:"pagos",i:"💳",l:"Pagos"},{k:"profesores",i:"👩‍🏫",l:"Profesores"},{k:"recuperos",i:"🔄",l:"Recuperos"}]
+    :profile.rol==="profesor"
+    ?[{k:"calendario",i:"📅",l:"Calendario"},{k:"alumnos",i:"👥",l:"Mis alumnos"},{k:"recuperos",i:"🔄",l:"Recuperos"}]
+    :[{k:"mis-turnos",i:"📅",l:"Mis turnos"},{k:"pagos",i:"💳",l:"Mis pagos"},{k:"recuperos",i:"🔄",l:"Recuperos"}];
+
+  const logout = async()=>{await sb.auth.signOut();setUser(null);setProfile(null);};
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      {/* Header */}
+      <div style={{background:"#fff",borderBottom:"1px solid #eee",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
+        <div className="row"><span style={{fontSize:20}}>🧘</span><span style={{fontWeight:500}}>Studio Pilates</span></div>
+        <div className="row">
+          <Avatar nombre={profile.nombre} size={30}/>
+          <span style={{fontSize:13,color:"#888"}}>{profile.nombre}</span>
+          <button className="btn" style={{fontSize:12,padding:"4px 10px"}} onClick={logout}>Salir</button>
+        </div>
+      </div>
+      {/* Nav */}
+      <div style={{background:"#fff",borderBottom:"1px solid #eee",display:"flex",gap:2,padding:"6px 10px",overflowX:"auto"}}>
+        {nav.map(n=><button key={n.k} className={`nav-btn${vista===n.k?" active":""}`} onClick={()=>setVista(n.k)}>{n.i} {n.l}</button>)}
+      </div>
+      {/* Content */}
+      <div style={{flex:1,padding:16,maxWidth:900,width:"100%",margin:"0 auto"}}>
+        {vista==="dashboard"&&<Dashboard profile={profile}/>}
+        {vista==="calendario"&&<Calendario profile={profile}/>}
+        {vista==="alumnos"&&<GestionAlumnos profile={profile}/>}
+        {vista==="pagos"&&<Pagos profile={profile}/>}
+        {vista==="profesores"&&profile.rol==="admin"&&<GestionProfesores/>}
+        {vista==="recuperos"&&<Recuperos profile={profile}/>}
+        {vista==="mis-turnos"&&<MisTurnos profile={profile}/>}
+      </div>
+    </div>
+  );
+}
+
+// ---- DASHBOARD ----
+function Dashboard({profile}){
+  const [stats,setStats]=React.useState({alumnos:0,profesores:0,pendientes:0,libres:0});
+  const [clases,setClases]=React.useState([]);
+  const now = new Date();
+
+  React.useEffect(()=>{
+    const load = async()=>{
+      const [{count:ca},{count:cp},{count:pp},{count:ll}] = await Promise.all([
+        sb.from("alumnos").select("*",{count:"exact",head:true}),
+        sb.from("profesores").select("*",{count:"exact",head:true}),
+        sb.from("pagos").select("*",{count:"exact",head:true}).in("estado",["pendiente","vencido"]),
+        sb.from("recuperos").select("*",{count:"exact",head:true}).is("reservado_por",null),
+      ]);
+      setStats({alumnos:ca||0,profesores:cp||0,pendientes:pp||0,libres:ll||0});
+      const {data:al}=await sb.from("alumnos").select("hora,dias");
+      const hoy=new Date().getDay();
+      const diaIdx=hoy===0?6:hoy-1;
+      const porHora={};
+      al?.forEach(a=>{if(a.dias?.includes(diaIdx)){porHora[a.hora]=(porHora[a.hora]||0)+1;}});
+      setClases(Object.entries(porHora).map(([h,c])=>({hora:+h,count:c})).sort((a,b)=>a.hora-b.hora));
+    };
+    load();
+  },[]);
+
+  return (
+    <div className="col" style={{gap:16}}>
+      <h2>Dashboard — {MESES[now.getMonth()]} {now.getFullYear()}</h2>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10}}>
+        {[{l:"Alumnos activos",v:stats.alumnos,e:"👥"},{l:"Profesores",v:stats.profesores,e:"👩‍🏫"},{l:"Pagos pendientes",v:stats.pendientes,e:"⚠️"},{l:"Lugares libres",v:stats.libres,e:"📭"}].map(c=>(
+          <div key={c.l} style={{background:"#f8f8f6",borderRadius:10,padding:"14px 16px"}}>
+            <div style={{fontSize:12,color:"#888",marginBottom:6}}>{c.e} {c.l}</div>
+            <div style={{fontSize:26,fontWeight:500}}>{c.v}</div>
+          </div>
+        ))}
+      </div>
+      {clases.length>0&&<>
+        <h3>Clases de hoy</h3>
+        <div className="col" style={{gap:6}}>
+          {clases.map(c=>(
+            <div key={c.hora} className="card row" style={{gap:12}}>
+              <span style={{fontWeight:500,minWidth:48,fontSize:14}}>{fmt(c.hora)}</span>
+              <div style={{flex:1,height:6,background:"#eee",borderRadius:3}}>
+                <div style={{height:"100%",width:`${Math.round(c.count/MAX*100)}%`,background:"#5DCAA5",borderRadius:3}}></div>
+              </div>
+              <span style={{fontSize:13,color:"#888"}}>{c.count}/{MAX}</span>
+            </div>
+          ))}
+        </div>
+      </>}
+    </div>
+  );
+}
+
+// ---- CALENDARIO ----
+function Calendario({profile}){
+  const [semana,setSemana]=React.useState(1);
+  const [alumnos,setAlumnos]=React.useState([]);
+  const [recuperos,setRecuperos]=React.useState([]);
+  const now = new Date();
+
+  React.useEffect(()=>{
+    const load=async()=>{
+      const {data:al}=await sb.from("alumnos").select("id,hora,dias,profesor_id,profiles(nombre)");
+      const {data:rec}=await sb.from("recuperos").select("*").eq("mes",now.getMonth()+1).eq("anio",now.getFullYear()).eq("semana",semana);
+      setAlumnos(al||[]);
+      setRecuperos(rec||[]);
+    };
+    load();
+  },[semana]);
+
+  const getSlot=(dia,hora)=>{
+    const libresIds=recuperos.filter(r=>r.dia===dia&&r.hora===hora&&!r.reservado_por).map(r=>r.alumno_id);
+    const fijos=alumnos.filter(a=>a.dias?.includes(dia)&&a.hora===hora&&!libresIds.includes(a.id));
+    const recup=recuperos.filter(r=>r.dia===dia&&r.hora===hora&&r.reservado_por).length;
+    return fijos.length+recup;
+  };
+
+  const diasConClases=[...new Set(alumnos.flatMap(a=>a.dias||[]))].sort();
+  const horasConClases=[...new Set(alumnos.map(a=>a.hora))].sort((a,b)=>a-b);
+
+  return (
+    <div className="col" style={{gap:16}}>
+      <div className="row" style={{justifyContent:"space-between"}}>
+        <h2>Calendario — semana {semana}</h2>
+        <div className="row" style={{gap:6}}>
+          {[1,2,3,4].map(s=><button key={s} className={`btn${semana===s?" btn-primary":""}`} style={{padding:"4px 10px"}} onClick={()=>setSemana(s)}>Sem {s}</button>)}
+        </div>
+      </div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+          <thead>
+            <tr>
+              <th style={{padding:"8px 6px",textAlign:"left",color:"#888",fontWeight:400,borderBottom:"1px solid #eee",minWidth:50}}>Hora</th>
+              {diasConClases.map(d=><th key={d} style={{padding:"8px 6px",textAlign:"center",color:"#888",fontWeight:400,borderBottom:"1px solid #eee",minWidth:90}}>{DAYS[d]}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {horasConClases.map(h=>(
+              <tr key={h}>
+                <td style={{padding:6,fontWeight:500,color:"#888",fontSize:12}}>{fmt(h)}</td>
+                {diasConClases.map(d=>{
+                  const hay=alumnos.some(a=>a.dias?.includes(d)&&a.hora===h);
+                  if(!hay) return <td key={d} style={{padding:4}}></td>;
+                  const ocu=getSlot(d,h);
+                  const lleno=ocu>=MAX;
+                  return (
+                    <td key={d} style={{padding:4}}>
+                      <div style={{background:lleno?"#FCEBEB":"#E1F5EE",borderRadius:8,padding:"6px 8px",border:`1px solid ${lleno?"#F09595":"#9FE1CB"}`,textAlign:"center"}}>
+                        <div style={{fontWeight:500,fontSize:12,color:lleno?"#A32D2D":"#0F6E56"}}>{ocu}/{MAX}</div>
+                        <div style={{fontSize:10,color:lleno?"#993C1D":"#085041"}}>{lleno?"Completo":"Libre"}</div>
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---- GESTION ALUMNOS ----
+function GestionAlumnos({profile}){
+  const [alumnos,setAlumnos]=React.useState([]);
+  const [profesores,setProfesores]=React.useState([]);
+  const [modal,setModal]=React.useState(null);
+  const [nuevo,setNuevo]=React.useState({nombre:"",email:"",pass:"",dias:[],hora:8,profesorId:""});
+  const [saving,setSaving]=React.useState(false);
+  const [err,setErr]=React.useState("");
+
+  const load=async()=>{
+    const q=sb.from("alumnos").select("id,hora,dias,profesor_id,profiles(id,nombre,email),profesores(profiles(nombre))");
+    if(profile.rol==="profesor"){
+      const {data:prof}=await sb.from("profesores").select("id").eq("profile_id",profile.id).single();
+      if(prof) q.eq("profesor_id",prof.id);
+    }
+    const {data}=await q;
+    setAlumnos(data||[]);
+    const {data:profs}=await sb.from("profesores").select("id,profiles(nombre)");
+    setProfesores(profs||[]);
+  };
+
+  React.useEffect(()=>{load();},[]);
+
+  const toggleDia=d=>{
+    const dias=nuevo.dias.includes(d)?nuevo.dias.filter(x=>x!==d):[...nuevo.dias,d];
+    if(dias.length<=3) setNuevo({...nuevo,dias});
+  };
+
+  const guardar=async()=>{
+    if(!nuevo.nombre||!nuevo.email||!nuevo.pass||nuevo.dias.length<2||!nuevo.profesorId){setErr("Completá todos los campos y elegí al menos 2 días");return;}
+    setSaving(true); setErr("");
+    const {data:authData,error:authErr}=await sb.auth.admin.createUser({email:nuevo.email,password:nuevo.pass,email_confirm:true});
+    if(authErr){setErr("Error creando usuario: "+authErr.message);setSaving(false);return;}
+    const uid=authData.user.id;
+    await sb.from("profiles").insert({id:uid,nombre:nuevo.nombre,email:nuevo.email,rol:"alumno"});
+    await sb.from("alumnos").insert({profile_id:uid,profesor_id:nuevo.profesorId,dias:nuevo.dias,hora:nuevo.hora});
+    const now=new Date();
+    const {data:al}=await sb.from("alumnos").select("id").eq("profile_id",uid).single();
+    if(al) await sb.from("pagos").insert({alumno_id:al.id,mes:now.getMonth()+1,anio:now.getFullYear(),estado:"pendiente"});
+    setModal(null);
+    setNuevo({nombre:"",email:"",pass:"",dias:[],hora:8,profesorId:""});
+    setSaving(false);
+    load();
+  };
+
+  return (
+    <div className="col" style={{gap:16}}>
+      <div className="row" style={{justifyContent:"space-between"}}>
+        <h2>{profile.rol==="profesor"?"Mis alumnos":"Alumnos"} ({alumnos.length})</h2>
+        {profile.rol==="admin"&&<button className="btn btn-primary" onClick={()=>setModal("nuevo")}>+ Nuevo alumno</button>}
+      </div>
+      <div className="col" style={{gap:8}}>
+        {alumnos.map(a=>(
+          <div key={a.id} className="card row" style={{gap:12,cursor:"pointer"}} onClick={()=>setModal(a)}>
+            <Avatar nombre={a.profiles?.nombre} size={38}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:500,fontSize:14,marginBottom:2}}>{a.profiles?.nombre}</div>
+              <div style={{fontSize:12,color:"#888"}}>{a.dias?.map(d=>DAYS[d]).join(", ")} — {fmt(a.hora)}</div>
+            </div>
+            <div style={{fontSize:12,color:"#888",textAlign:"right"}}>
+              {a.profesores?.profiles?.nombre}
+            </div>
+          </div>
+        ))}
+        {alumnos.length===0&&<div style={{textAlign:"center",padding:32,color:"#888",background:"#f8f8f6",borderRadius:12}}>No hay alumnos registrados aún.</div>}
+      </div>
+
+      {modal==="nuevo"&&(
+        <div className="modal-overlay" onClick={()=>setModal(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="row" style={{justifyContent:"space-between",marginBottom:16}}>
+              <h3>Nuevo alumno</h3>
+              <button style={{background:"none",border:"none",fontSize:20,color:"#888"}} onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="col" style={{gap:12}}>
+              <div><label>Nombre completo</label><input value={nuevo.nombre} onChange={e=>setNuevo({...nuevo,nombre:e.target.value})}/></div>
+              <div><label>Email</label><input type="email" value={nuevo.email} onChange={e=>setNuevo({...nuevo,email:e.target.value})}/></div>
+              <div><label>Contraseña inicial</label><input type="password" value={nuevo.pass} onChange={e=>setNuevo({...nuevo,pass:e.target.value})}/></div>
+              <div>
+                <label>Días (elegí 2 o 3)</label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:4}}>
+                  {DAYS.map((d,i)=><button key={i} onClick={()=>toggleDia(i)} style={{padding:"4px 10px",borderRadius:20,border:"1px solid #ddd",background:nuevo.dias.includes(i)?"#5DCAA5":"#fff",color:nuevo.dias.includes(i)?"#fff":"#333",fontSize:12}}>{d}</button>)}
+                </div>
+              </div>
+              <div><label>Horario</label><select value={nuevo.hora} onChange={e=>setNuevo({...nuevo,hora:+e.target.value})}>{HOURS.map(h=><option key={h} value={h}>{fmt(h)}</option>)}</select></div>
+              <div><label>Profesor asignado</label>
+                <select value={nuevo.profesorId} onChange={e=>setNuevo({...nuevo,profesorId:e.target.value})}>
+                  <option value="">Seleccioná un profesor</option>
+                  {profesores.map(p=><option key={p.id} value={p.id}>{p.profiles?.nombre}</option>)}
+                </select>
+              </div>
+              {err&&<p style={{color:"#A32D2D",fontSize:13}}>{err}</p>}
+              <button className="btn btn-primary" onClick={guardar} disabled={saving} style={{width:"100%",padding:10}}>{saving?"Guardando...":"Guardar alumno"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal&&modal!=="nuevo"&&(
+        <div className="modal-overlay" onClick={()=>setModal(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="row" style={{justifyContent:"space-between",marginBottom:16}}>
+              <div className="row"><Avatar nombre={modal.profiles?.nombre} size={40}/><div><div style={{fontWeight:500}}>{modal.profiles?.nombre}</div><div style={{fontSize:12,color:"#888"}}>{modal.profiles?.email}</div></div></div>
+              <button style={{background:"none",border:"none",fontSize:20,color:"#888"}} onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="col" style={{gap:8,fontSize:13}}>
+              <div className="row" style={{justifyContent:"space-between"}}><span style={{color:"#888"}}>Días</span><span>{modal.dias?.map(d=>DAYS[d]).join(", ")}</span></div>
+              <div className="row" style={{justifyContent:"space-between"}}><span style={{color:"#888"}}>Horario</span><span>{fmt(modal.hora)}</span></div>
+              <div className="row" style={{justifyContent:"space-between"}}><span style={{color:"#888"}}>Profesor</span><span>{modal.profesores?.profiles?.nombre}</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- PAGOS ----
+function Pagos({profile}){
+  const [pagos,setPagos]=React.useState([]);
+
+  const load=async()=>{
+    let q=sb.from("pagos").select("id,mes,anio,estado,alumno_id,alumnos(profiles(nombre))").order("anio",{ascending:false}).order("mes",{ascending:false});
+    if(profile.rol==="alumno"){
+      const {data:al}=await sb.from("alumnos").select("id").eq("profile_id",profile.id).single();
+      if(al) q=q.eq("alumno_id",al.id);
+    }
+    const {data}=await q;
+    setPagos(data||[]);
+  };
+
+  React.useEffect(()=>{load();},[]);
+
+  const marcar=async(id,estado)=>{
+    await sb.from("pagos").update({estado}).eq("id",id);
+    load();
+  };
+
+  const agrupado=pagos.reduce((acc,p)=>{
+    const k=p.alumno_id;
+    if(!acc[k]) acc[k]={nombre:p.alumnos?.profiles?.nombre,pagos:[]};
+    acc[k].pagos.push(p);
+    return acc;
+  },{});
+
+  return (
+    <div className="col" style={{gap:16}}>
+      <h2>{profile.rol==="alumno"?"Mis pagos":"Control de pagos"}</h2>
+      {Object.entries(agrupado).map(([aid,{nombre,pagos:ps}])=>(
+        <div key={aid} className="card">
+          {profile.rol!=="alumno"&&<div className="row" style={{marginBottom:12}}><Avatar nombre={nombre} size={30}/><span style={{fontWeight:500}}>{nombre}</span></div>}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {ps.map(p=>(
+              <div key={p.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"10px 14px",border:"1px solid #eee",borderRadius:10,background:"#f8f8f6",minWidth:90}}>
+                <span style={{fontSize:12,color:"#888"}}>{MESES[p.mes-1]}</span>
+                <Badge estado={p.estado}/>
+                {profile.rol==="admin"&&p.estado!=="pagado"&&(
+                  <button onClick={()=>marcar(p.id,"pagado")} style={{fontSize:11,padding:"3px 8px",borderRadius:20,border:"1px solid #9FE1CB",background:"#E1F5EE",color:"#0F6E56"}}>Marcar pagado</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {pagos.length===0&&<div style={{textAlign:"center",padding:32,color:"#888",background:"#f8f8f6",borderRadius:12}}>No hay registros de pagos.</div>}
+    </div>
+  );
+}
+
+// ---- GESTION PROFESORES ----
+function GestionProfesores(){
+  const [profesores,setProfesores]=React.useState([]);
+  const [modal,setModal]=React.useState(false);
+  const [nuevo,setNuevo]=React.useState({nombre:"",email:"",pass:""});
+  const [saving,setSaving]=React.useState(false);
+  const [err,setErr]=React.useState("");
+  const colors=["#5DCAA5","#7F77DD","#D85A30","#D4537E","#378ADD"];
+
+  const load=async()=>{
+    const {data}=await sb.from("profesores").select("id,color,profile_id,profiles(nombre,email)");
+    const {data:al}=await sb.from("alumnos").select("profesor_id");
+    const counts={};
+    al?.forEach(a=>{counts[a.profesor_id]=(counts[a.profesor_id]||0)+1;});
+    setProfesores((data||[]).map(p=>({...p,totalAlumnos:counts[p.id]||0})));
+  };
+
+  React.useEffect(()=>{load();},[]);
+
+  const guardar=async()=>{
+    if(!nuevo.nombre||!nuevo.email||!nuevo.pass){setErr("Completá todos los campos");return;}
+    setSaving(true); setErr("");
+    const {data:authData,error:authErr}=await sb.auth.admin.createUser({email:nuevo.email,password:nuevo.pass,email_confirm:true});
+    if(authErr){setErr("Error: "+authErr.message);setSaving(false);return;}
+    const uid=authData.user.id;
+    await sb.from("profiles").insert({id:uid,nombre:nuevo.nombre,email:nuevo.email,rol:"profesor"});
+    await sb.from("profesores").insert({profile_id:uid,color:colors[profesores.length%colors.length]});
+    setModal(false);
+    setNuevo({nombre:"",email:"",pass:""});
+    setSaving(false);
+    load();
+  };
+
+  return (
+    <div className="col" style={{gap:16}}>
+      <div className="row" style={{justifyContent:"space-between"}}>
+        <h2>Profesores ({profesores.length})</h2>
+        <button className="btn btn-primary" onClick={()=>setModal(true)}>+ Nuevo profesor</button>
+      </div>
+      <div className="col" style={{gap:8}}>
+        {profesores.map(p=>(
+          <div key={p.id} className="card row" style={{gap:12}}>
+            <Avatar nombre={p.profiles?.nombre} size={42} color={p.color}/>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:500,marginBottom:2}}>{p.profiles?.nombre}</div>
+              <div style={{fontSize:12,color:"#888"}}>{p.profiles?.email}</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:20,fontWeight:500}}>{p.totalAlumnos}</div>
+              <div style={{fontSize:11,color:"#888"}}>alumnos</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {modal&&(
+        <div className="modal-overlay" onClick={()=>setModal(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="row" style={{justifyContent:"space-between",marginBottom:16}}>
+              <h3>Nuevo profesor</h3>
+              <button style={{background:"none",border:"none",fontSize:20,color:"#888"}} onClick={()=>setModal(false)}>×</button>
+            </div>
+            <div className="col" style={{gap:12}}>
+              <div><label>Nombre completo</label><input value={nuevo.nombre} onChange={e=>setNuevo({...nuevo,nombre:e.target.value})}/></div>
+              <div><label>Email</label><input type="email" value={nuevo.email} onChange={e=>setNuevo({...nuevo,email:e.target.value})}/></div>
+              <div><label>Contraseña inicial</label><input type="password" value={nuevo.pass} onChange={e=>setNuevo({...nuevo,pass:e.target.value})}/></div>
+              {err&&<p style={{color:"#A32D2D",fontSize:13}}>{err}</p>}
+              <button className="btn btn-primary" onClick={guardar} disabled={saving} style={{width:"100%",padding:10}}>{saving?"Guardando...":"Guardar profesor"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- RECUPEROS ----
+function Recuperos({profile}){
+  const [libres,setLibres]=React.useState([]);
+  const [confirmados,setConfirmados]=React.useState([]);
+  const [alumnoId,setAlumnoId]=React.useState(null);
+  const now=new Date();
+
+  React.useEffect(()=>{
+    const load=async()=>{
+      if(profile.rol==="alumno"){
+        const {data:al}=await sb.from("alumnos").select("id").eq("profile_id",profile.id).single();
+        if(al) setAlumnoId(al.id);
+      }
+      const {data:l}=await sb.from("recuperos").select("*,alumnos(profiles(nombre))").is("reservado_por",null).eq("mes",now.getMonth()+1).eq("anio",now.getFullYear());
+      const {data:c}=await sb.from("recuperos").select("*,alumnos!recuperos_reservado_por_fkey(profiles(nombre))").not("reservado_por","is",null).eq("mes",now.getMonth()+1).eq("anio",now.getFullYear());
+      setLibres(l||[]);
+      setConfirmados(c||[]);
+    };
+    load();
+  },[]);
+
+  const reservar=async(id)=>{
+    if(!alumnoId) return;
+    await sb.from("recuperos").update({reservado_por:alumnoId}).eq("id",id);
+    const {data:l}=await sb.from("recuperos").select("*").is("reservado_por",null).eq("mes",now.getMonth()+1).eq("anio",now.getFullYear());
+    const {data:c}=await sb.from("recuperos").select("*,alumnos!recuperos_reservado_por_fkey(profiles(nombre))").not("reservado_por","is",null).eq("mes",now.getMonth()+1).eq("anio",now.getFullYear());
+    setLibres(l||[]);
+    setConfirmados(c||[]);
+  };
+
+  return (
+    <div className="col" style={{gap:16}}>
+      <h2>Lugares libres y recuperos</h2>
+      <h3>Disponibles para recuperar</h3>
+      {libres.length===0
+        ?<div style={{textAlign:"center",padding:24,color:"#888",background:"#f8f8f6",borderRadius:12}}>No hay lugares libres en este momento.</div>
+        :<div className="col" style={{gap:8}}>
+          {libres.map(l=>(
+            <div key={l.id} className="card row" style={{gap:12,borderColor:"#9FE1CB"}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:"#5DCAA5",flexShrink:0}}></div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:500,fontSize:14}}>{DAYS[l.dia]} — {fmt(l.hora)}</div>
+                <div style={{fontSize:12,color:"#888"}}>Semana {l.semana} — {MESES[l.mes-1]}</div>
+              </div>
+              {profile.rol==="alumno"&&alumnoId!==l.alumno_id&&(
+                <button className="btn" style={{fontSize:12,padding:"5px 12px",background:"#E1F5EE",color:"#0F6E56",border:"1px solid #9FE1CB"}} onClick={()=>reservar(l.id)}>Reservar</button>
+              )}
+            </div>
+          ))}
+        </div>
+      }
+      {confirmados.length>0&&<>
+        <h3>Recuperos confirmados</h3>
+        <div className="col" style={{gap:6}}>
+          {confirmados.map(c=>(
+            <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#f8f8f6",borderRadius:10}}>
+              <Avatar nombre={c.alumnos?.profiles?.nombre} size={28}/>
+              <div style={{flex:1,fontSize:13}}><span style={{fontWeight:500}}>{c.alumnos?.profiles?.nombre}</span><span style={{color:"#888"}}> — {DAYS[c.dia]} {fmt(c.hora)}, sem {c.semana}</span></div>
+              <span className="badge badge-green">Confirmado</span>
+            </div>
+          ))}
+        </div>
+      </>}
+    </div>
+  );
+}
+
+// ---- MIS TURNOS ----
+function MisTurnos({profile}){
+  const [alumno,setAlumno]=React.useState(null);
+  const [profesor,setProfesor]=React.useState(null);
+  const [recuperos,setRecuperos]=React.useState([]);
+  const now=new Date();
+
+  const load=async()=>{
+    const {data:al}=await sb.from("alumnos").select("id,hora,dias,profesor_id,profesores(color,profiles(nombre))").eq("profile_id",profile.id).single();
+    if(al){
+      setAlumno(al);
+      setProfesor(al.profesores);
+      const {data:rec}=await sb.from("recuperos").select("*").eq("alumno_id",al.id).eq("mes",now.getMonth()+1).eq("anio",now.getFullYear());
+      setRecuperos(rec||[]);
+    }
+  };
+
+  React.useEffect(()=>{load();},[]);
+
+  const marcarLibre=async(dia,semana)=>{
+    if(!alumno) return;
+    const ya=recuperos.find(r=>r.alumno_id===alumno.id&&r.dia===dia&&r.semana===semana);
+    if(ya) return;
+    await sb.from("recuperos").insert({alumno_id:alumno.id,dia,hora:alumno.hora,semana,mes:now.getMonth()+1,anio:now.getFullYear()});
+    load();
+  };
+
+  if(!alumno) return <div style={{textAlign:"center",padding:40,color:"#888"}}>Cargando tus turnos...</div>;
+
+  return (
+    <div className="col" style={{gap:16}}>
+      <h2>Mis turnos</h2>
+      {profesor&&(
+        <div style={{background:"#f8f8f6",borderRadius:12,padding:"12px 16px",display:"flex",gap:12,alignItems:"center"}}>
+          <Avatar nombre={profesor.profiles?.nombre} size={38} color={profesor.color}/>
+          <div><div style={{fontWeight:500}}>{profesor.profiles?.nombre}</div><div style={{fontSize:12,color:"#888"}}>Tu profesora</div></div>
+        </div>
+      )}
+      {[1,2,3,4].map(s=>(
+        <div key={s}>
+          <h3 style={{marginBottom:8,color:"#888",fontSize:13}}>Semana {s}</h3>
+          <div className="col" style={{gap:6}}>
+            {alumno.dias?.map(d=>{
+              const rec=recuperos.find(r=>r.dia===d&&r.semana===s);
+              return (
+                <div key={d} className="card row" style={{gap:12,borderColor:rec?"#F7C1C1":undefined}}>
+                  <div style={{flex:1}}>
+                    <span style={{fontWeight:500}}>{DAYS[d]}</span>
+                    <span style={{color:"#888",fontSize:13}}> {fmt(alumno.hora)}</span>
+                  </div>
+                  {rec
+                    ?<span className={`badge ${rec.reservado_por?"badge-green":"badge-yellow"}`}>{rec.reservado_por?"Lugar tomado":"Marcado libre"}</span>
+                    :<button onClick={()=>marcarLibre(d,s)} style={{fontSize:12,padding:"4px 12px",borderRadius:20,border:"1px solid #FAC775",background:"#FAEEDA",color:"#854F0B"}}>Voy a faltar</button>
+                  }
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
