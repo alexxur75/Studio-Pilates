@@ -44,7 +44,8 @@
 
 const SUPABASE_URL = "https://kgltrhrwtlbzheslgzlm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnbHRyaHJ3dGxiemhlc2xnemxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzODEyMjAsImV4cCI6MjA5NTk1NzIyMH0.-qxaV_z_k-DE6ai9UBpVGtvcB6sAy4CVQaq6f91CkiA";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_SERVICE_KEY = "ACÁ_TU_SERVICE_ROLE_KEY";
+ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DAYS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 const HOURS = Array.from({length:14},(_,i)=>i+7);
